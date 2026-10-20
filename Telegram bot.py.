@@ -1,0 +1,80 @@
+import os
+import logging
+import requests
+
+TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+API = f"https://api.telegram.org/bot{TOKEN}"
+
+logging.basicConfig(level=logging.INFO)
+
+def send_message(chat_id, text):
+    requests.post(
+        f"{API}/sendMessage",
+        json={"chat_id": chat_id, "text": text},
+        timeout=15
+    )
+
+def main():
+    if not TOKEN:
+        raise RuntimeError("TELEGRAM_BOT_TOKEN is not configured")
+
+    offset = None
+    logging.info("Telegram bot started")
+
+    while True:
+        try:
+            response = requests.get(
+                f"{API}/getUpdates",
+                params={"timeout": 25, "offset": offset},
+                timeout=35
+            )
+            response.raise_for_status()
+
+            for update in response.json().get("result", []):
+                offset = update["update_id"] + 1
+                message = update.get("message", {})
+                chat = message.get("chat", {})
+                chat_id = chat.get("id")
+                text = message.get("text", "").strip()
+
+                if not chat_id:
+                    continue
+
+                if text == "/start":
+                    send_message(
+                        chat_id,
+                        "Welcome to BetPawa Football Analyzer! ⚽\n"
+                        "Send /help to see available commands."
+                    )
+
+                elif text == "/help":
+                    send_message(
+                        chat_id,
+                        "Commands:\n"
+                        "/start - Start the bot\n"
+                        "/predictions - Example match analysis\n\n"
+                        "This demo does not use live match data."
+                    )
+
+                elif text == "/predictions":
+                    send_message(
+                        chat_id,
+                        "⚽ Match analysis demo\n\n"
+                        "No live fixtures are connected yet. "
+                        "A football data source is needed for "
+                        "real match predictions."
+                    )
+
+                else:
+                    send_message(
+                        chat_id,
+                        "Unknown command. Send /help."
+                    )
+
+        except requests.RequestException:
+            logging.exception("Telegram request failed")
+            import time
+            time.sleep(5)
+
+if __name__ == "__main__":
+    main()
